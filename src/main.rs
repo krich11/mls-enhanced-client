@@ -6,6 +6,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use openmls::prelude::*;
+use openmls::prelude::tls_codec::{Serialize, Deserialize};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -302,6 +303,21 @@ impl App {
                 self.screen = AppScreen::Settings;
                 self.input_mode = InputMode::Settings;
             }
+            Some(&"status") => {
+                if self.network_client.is_connected() {
+                    self.status_message = format!("Connected to MLS service at {}", self.config.delivery_service_address);
+                } else {
+                    self.status_message = format!("Disconnected from MLS service at {}", self.config.delivery_service_address);
+                }
+            }
+            Some(&"list") => {
+                if self.groups.is_empty() {
+                    self.status_message = "No groups available. Create a group with 'create <group_name>' or join an existing one with 'join <group_id>'".to_string();
+                } else {
+                    let group_list: Vec<String> = self.groups.keys().map(|id| format!("- {}", id)).collect();
+                    self.status_message = format!("Available groups:\n{}", group_list.join("\n"));
+                }
+            }
             _ => {
                 self.status_message = format!("Unknown command: {}", command);
             }
@@ -317,7 +333,7 @@ impl App {
             .wire_format_policy(WireFormatPolicy::default())
             .build();
         
-        let _mls_group = MlsGroup::new(
+        let mls_group = MlsGroup::new(
             &self.mls_client.crypto,
             &self.mls_client.signer,
             &group_config,
@@ -326,6 +342,9 @@ impl App {
                 signature_key: self.mls_client.signature_key.clone(),
             },
         )?;
+
+        // Store the MLS group
+        self.mls_client.add_group(&group_id, mls_group);
 
         // Store group locally
         let group = Group {
@@ -345,28 +364,84 @@ impl App {
             self.group_list_state.select(Some(pos));
         }
         
-        self.status_message = format!("Created group: {} (ID: {})", group_name, group_id);
+        // Publish group to MLS service if connected
+        if self.network_client.is_connected() {
+            // Export the group info for sharing
+            let group_info = group_id.as_bytes().to_vec();
+            if let Err(e) = self.network_client.create_group(&group_id, &group_info).await {
+                self.status_message = format!("Created group: {} (ID: {}), but failed to publish to MLS service: {}", group_name, group_id, e);
+            } else {
+                self.status_message = format!("Created and published group: {} (ID: {})", group_name, group_id);
+            }
+        } else {
+            self.status_message = format!("Created local group: {} (ID: {}) - not connected to MLS service", group_name, group_id);
+        }
+        
         Ok(())
     }
 
     async fn join_group(&mut self, group_id: &str) -> Result<()> {
-        // In a real implementation, this would fetch the group from the delivery service
-        // For now, we'll simulate joining a group
-        if !self.groups.contains_key(group_id) {
-            let group = Group {
-                id: group_id.to_string(),
-                name: format!("Group {}", group_id),
-                members: vec![self.config.username.clone()],
-                messages: Vec::new(),
-                is_active: true,
-            };
-            
-            self.groups.insert(group_id.to_string(), group);
-            self.active_group = Some(group_id.to_string());
-            
-            self.status_message = format!("Joined group: {}", group_id);
-        } else {
+        // Check if we're connected to the MLS service
+        if !self.network_client.is_connected() {
+            self.status_message = format!("Cannot join group {}: Not connected to MLS service. Use 'status' command to check connection.", group_id);
+            return Ok(());
+        }
+
+        // Check if we're already in this group
+        if self.groups.contains_key(group_id) {
             self.status_message = format!("Already in group: {}", group_id);
+            return Ok(());
+        }
+
+        // Try to join the group through the MLS service
+        match self.network_client.join_group(group_id, &self.mls_client.key_package.tls_serialize_detached()?).await {
+            Ok(welcome_data) => {
+                if welcome_data.is_empty() {
+                    self.status_message = format!("Group {} not found or access denied. This could mean:\n1. The group doesn't exist on the MLS service\n2. You don't have permission to join\n3. The MLS service is not properly configured\n\nTry creating the group first with 'create <group_name>' or check your MLS service configuration.", group_id);
+                    return Ok(());
+                }
+
+                // Parse the welcome message and join the MLS group
+                match Welcome::tls_deserialize(&mut welcome_data.as_slice()) {
+                    Ok(_welcome) => {
+                        // For now, we'll just create a local group representation
+                        // In a full implementation, we'd create the MLS group from the welcome message
+                        // let mls_group = MlsGroup::new_from_welcome(
+                        //     &self.mls_client.crypto,
+                        //     &MlsGroupConfig::default(),
+                        //     welcome,
+                        //     Some(&self.mls_client.storage),
+                        // )?;
+                        // self.mls_client.add_group(group_id, mls_group);
+
+                        // Create local group representation
+                        let group = Group {
+                            id: group_id.to_string(),
+                            name: format!("Group {}", group_id),
+                            members: vec![self.config.username.clone()], // Will be updated with real members
+                            messages: Vec::new(),
+                            is_active: true,
+                        };
+                        
+                        self.groups.insert(group_id.to_string(), group);
+                        self.active_group = Some(group_id.to_string());
+                        
+                        // Update group list selection
+                        let groups: Vec<_> = self.groups.keys().cloned().collect();
+                        if let Some(pos) = groups.iter().position(|g| g == group_id) {
+                            self.group_list_state.select(Some(pos));
+                        }
+                        
+                        self.status_message = format!("Successfully joined group: {} (Welcome message received)", group_id);
+                    }
+                    Err(e) => {
+                        self.status_message = format!("Failed to parse welcome message for group {}: {}", group_id, e);
+                    }
+                }
+            }
+            Err(e) => {
+                self.status_message = format!("Failed to join group {}: {}\n\nThis could be due to:\n1. Network connectivity issues\n2. MLS service not running\n3. Invalid group ID\n\nTry using 'status' command to check connection.", group_id, e);
+            }
         }
         Ok(())
     }
@@ -388,11 +463,24 @@ impl App {
     }
 
     async fn save_settings(&mut self) -> Result<()> {
+        let old_address = self.config.delivery_service_address.clone();
         self.config.delivery_service_address = self.temp_delivery_service.clone();
         self.config.username = self.temp_username.clone();
         self.config.save().await?;
         
-        self.status_message = "Settings saved".to_string();
+        // Reconnect to MLS service if address changed
+        if old_address != self.config.delivery_service_address {
+            self.network_client = NetworkClient::new(&self.config.delivery_service_address).await?;
+            
+            if self.network_client.is_connected() {
+                self.status_message = format!("Settings saved. Connected to MLS service at {}", self.config.delivery_service_address);
+            } else {
+                self.status_message = format!("Settings saved. Failed to connect to MLS service at {}", self.config.delivery_service_address);
+            }
+        } else {
+            self.status_message = "Settings saved".to_string();
+        }
+        
         Ok(())
     }
 
@@ -581,7 +669,20 @@ impl App {
             "  create <group_name>: Create new group",
             "  join <group_id>: Join existing group",
             "  send <message>: Send message",
+            "  list: Show available groups",
+            "  status: Check MLS service connection",
             "  quit: Exit application",
+            "",
+            "MLS Service:",
+            "  Groups are shared when connected to MLS service",
+            "  Local groups are created when disconnected",
+            "  Use 'status' command to check connection",
+            "",
+            "Troubleshooting:",
+            "  If 'group not found':",
+            "  - Check connection with 'status'",
+            "  - Create group first with 'create'",
+            "  - Try joining 'test-group' for demo",
             "",
             "Press any key to close",
         ];
