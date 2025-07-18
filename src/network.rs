@@ -32,6 +32,31 @@ pub struct ListKeyPackagesMessage {
     pub client_id: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateGroupMessage {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub group_id: String,
+    pub group_info: Vec<u8>,
+    pub client_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JoinGroupMessage {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub group_id: String,
+    pub key_package: Vec<u8>,
+    pub client_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListGroupsMessage {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub client_id: String,
+}
+
 pub struct NetworkClient {
     delivery_service_address: String,
     connected: bool,
@@ -150,8 +175,22 @@ impl NetworkClient {
             return Err(anyhow::anyhow!("Not connected to delivery service"));
         }
         
-        // In a real implementation, this would create the group on the delivery service
-        println!("Creating group {} ({} bytes)", group_id, group_info.len());
+        if let Some(stream_arc) = &self.stream {
+            let create_message = CreateGroupMessage {
+                message_type: "CreateGroup".to_string(),
+                group_id: group_id.to_string(),
+                group_info: group_info.to_vec(),
+                client_id: "mls-client".to_string(),
+            };
+            
+            let message_json = serde_json::to_string(&create_message)?;
+            let mut stream_guard = stream_arc.lock().unwrap();
+            stream_guard.write_all(message_json.as_bytes()).await?;
+            stream_guard.write_all(b"\n").await?;
+            stream_guard.flush().await?;
+            println!("Creating group {} ({} bytes) on server", group_id, group_info.len());
+        }
+        
         Ok(())
     }
 
@@ -160,9 +199,48 @@ impl NetworkClient {
             return Err(anyhow::anyhow!("Not connected to delivery service"));
         }
         
-        // In a real implementation, this would join the group on the delivery service
-        // and return the Welcome message
-        println!("Joining group {} with key package ({} bytes)", group_id, key_package.len());
+        if let Some(stream_arc) = &self.stream {
+            let join_message = JoinGroupMessage {
+                message_type: "JoinGroup".to_string(),
+                group_id: group_id.to_string(),
+                key_package: key_package.to_vec(),
+                client_id: "mls-client".to_string(),
+            };
+            
+            let message_json = serde_json::to_string(&join_message)?;
+            let mut stream_guard = stream_arc.lock().unwrap();
+            stream_guard.write_all(message_json.as_bytes()).await?;
+            stream_guard.write_all(b"\n").await?;
+            stream_guard.flush().await?;
+            println!("Joining group {} with key package ({} bytes) on server", group_id, key_package.len());
+        }
+        
+        // For now, return empty to indicate group not found
+        // In a real implementation, this would wait for a response from the server
+        Ok(Vec::new())
+    }
+
+    pub async fn list_groups(&self) -> Result<Vec<String>> {
+        if !self.connected {
+            return Err(anyhow::anyhow!("Not connected to delivery service"));
+        }
+        
+        if let Some(stream_arc) = &self.stream {
+            let list_message = ListGroupsMessage {
+                message_type: "ListGroups".to_string(),
+                client_id: "mls-client".to_string(),
+            };
+            
+            let message_json = serde_json::to_string(&list_message)?;
+            let mut stream_guard = stream_arc.lock().unwrap();
+            stream_guard.write_all(message_json.as_bytes()).await?;
+            stream_guard.write_all(b"\n").await?;
+            stream_guard.flush().await?;
+            println!("Requesting list of groups from server");
+        }
+        
+        // For now, return empty list
+        // In a real implementation, this would wait for a response from the server
         Ok(Vec::new())
     }
 }

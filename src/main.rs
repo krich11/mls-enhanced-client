@@ -313,13 +313,29 @@ impl App {
             }
             Some(&"groups") => {
                 if self.groups.is_empty() {
-                    self.status_message = "No groups available. Use 'create <group_name>' to create a group.".to_string();
+                    self.status_message = "No local groups available. Use 'create <group_name>' to create a group.".to_string();
                 } else {
                     let groups_info: Vec<String> = self.groups
                         .iter()
                         .map(|(id, group)| format!("• {} (ID: {}) - {} members", group.name, id, group.members.len()))
                         .collect();
-                    self.status_message = format!("Available groups:\n{}", groups_info.join("\n"));
+                    self.status_message = format!("Local groups:\n{}", groups_info.join("\n"));
+                }
+            }
+            Some(&"list") => {
+                // List groups from the server
+                match self.network_client.list_groups().await {
+                    Ok(server_groups) => {
+                        if server_groups.is_empty() {
+                            self.status_message = "No groups found on server. Use 'create <group_name>' to create a group.".to_string();
+                        } else {
+                            let groups_list = server_groups.join("\n• ");
+                            self.status_message = format!("Groups available on server:\n• {}", groups_list);
+                        }
+                    }
+                    Err(e) => {
+                        self.status_message = format!("Failed to list groups from server: {}", e);
+                    }
                 }
             }
             Some(&"status") => {
@@ -332,7 +348,7 @@ impl App {
                 }
             }
             _ => {
-                self.status_message = format!("Unknown command: {}. Available commands: create, join, send, groups, status, settings, help, quit", command);
+                self.status_message = format!("Unknown command: {}. Available commands: create, join, send, groups, list, status, settings, help, quit", command);
             }
         }
         Ok(())
