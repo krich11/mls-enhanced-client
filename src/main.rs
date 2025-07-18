@@ -311,6 +311,14 @@ impl App {
                     self.status_message = format!("Disconnected from MLS service at {}", self.config.delivery_service_address);
                 }
             }
+            Some(&"list") => {
+                if self.groups.is_empty() {
+                    self.status_message = "No groups available. Create a group with 'create <group_name>' or join an existing one with 'join <group_id>'".to_string();
+                } else {
+                    let group_list: Vec<String> = self.groups.keys().map(|id| format!("- {}", id)).collect();
+                    self.status_message = format!("Available groups:\n{}", group_list.join("\n"));
+                }
+            }
             _ => {
                 self.status_message = format!("Unknown command: {}", command);
             }
@@ -377,7 +385,7 @@ impl App {
     async fn join_group(&mut self, group_id: &str) -> Result<()> {
         // Check if we're connected to the MLS service
         if !self.network_client.is_connected() {
-            self.status_message = format!("Cannot join group {}: Not connected to MLS service", group_id);
+            self.status_message = format!("Cannot join group {}: Not connected to MLS service. Use 'status' command to check connection.", group_id);
             return Ok(());
         }
 
@@ -391,7 +399,7 @@ impl App {
         match self.network_client.join_group(group_id, &self.mls_client.key_package.tls_serialize_detached()?).await {
             Ok(welcome_data) => {
                 if welcome_data.is_empty() {
-                    self.status_message = format!("Group {} not found or access denied", group_id);
+                    self.status_message = format!("Group {} not found or access denied. This could mean:\n1. The group doesn't exist on the MLS service\n2. You don't have permission to join\n3. The MLS service is not properly configured\n\nTry creating the group first with 'create <group_name>' or check your MLS service configuration.", group_id);
                     return Ok(());
                 }
 
@@ -421,7 +429,7 @@ impl App {
                 self.status_message = format!("Successfully joined group: {}", group_id);
             }
             Err(e) => {
-                self.status_message = format!("Failed to join group {}: {}", group_id, e);
+                self.status_message = format!("Failed to join group {}: {}\n\nThis could be due to:\n1. Network connectivity issues\n2. MLS service not running\n3. Invalid group ID\n\nTry using 'status' command to check connection.", group_id, e);
             }
         }
         Ok(())
@@ -650,6 +658,7 @@ impl App {
             "  create <group_name>: Create new group",
             "  join <group_id>: Join existing group",
             "  send <message>: Send message",
+            "  list: Show available groups",
             "  status: Check MLS service connection",
             "  quit: Exit application",
             "",
@@ -657,6 +666,12 @@ impl App {
             "  Groups are shared when connected to MLS service",
             "  Local groups are created when disconnected",
             "  Use 'status' command to check connection",
+            "",
+            "Troubleshooting:",
+            "  If 'group not found':",
+            "  - Check connection with 'status'",
+            "  - Create group first with 'create'",
+            "  - Try joining 'test-group' for demo",
             "",
             "Press any key to close",
         ];

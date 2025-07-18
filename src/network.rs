@@ -117,6 +117,19 @@ impl NetworkClient {
         // In a real implementation, this would join the group on the delivery service
         // and return the Welcome message
         println!("Joining group {} with key package ({} bytes)", group_id, key_package.len());
-        Ok(Vec::new())
+        
+        // For testing purposes, we'll simulate different scenarios:
+        // 1. If the group ID contains "test", we'll simulate a successful join
+        // 2. Otherwise, we'll simulate the group not existing
+        
+        if group_id.contains("test") || group_id.contains("demo") {
+            // Simulate successful join - return some dummy welcome data
+            println!("Simulating successful join to group: {}", group_id);
+            Ok(vec![1, 2, 3, 4, 5]) // Dummy welcome data
+        } else {
+            // Simulate group not found
+            println!("Simulating group not found: {}", group_id);
+            Ok(Vec::new()) // Empty response indicates group not found
+        }
     }
 }
