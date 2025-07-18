@@ -1,8 +1,10 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tokio::net::TcpStream;
 use tokio::time::timeout;
+use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
+use futures_util::{SinkExt, StreamExt};
+use url::Url;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkMessage {
@@ -17,6 +19,7 @@ pub struct NetworkMessage {
 pub struct NetworkClient {
     delivery_service_address: String,
     connected: bool,
+    websocket: Option<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>>,
 }
 
 impl NetworkClient {
@@ -24,6 +27,7 @@ impl NetworkClient {
         let mut client = Self {
             delivery_service_address: delivery_service_address.to_string(),
             connected: false,
+            websocket: None,
         };
         
         // Attempt to connect to the delivery service
@@ -33,21 +37,32 @@ impl NetworkClient {
     }
 
     pub async fn connect(&mut self) -> Result<()> {
+        // Convert address to WebSocket URL
+        let ws_url = if self.delivery_service_address.starts_with("ws://") || self.delivery_service_address.starts_with("wss://") {
+            self.delivery_service_address.clone()
+        } else {
+            format!("ws://{}", self.delivery_service_address)
+        };
+        
+        let url = Url::parse(&ws_url)?;
+        
         // Attempt to connect with timeout
-        match timeout(Duration::from_secs(5), TcpStream::connect(&self.delivery_service_address)).await {
-            Ok(Ok(_stream)) => {
+        match timeout(Duration::from_secs(5), connect_async(url)).await {
+            Ok(Ok((ws_stream, _))) => {
+                self.websocket = Some(ws_stream);
                 self.connected = true;
                 println!("Connected to MLS Delivery Service at {}", self.delivery_service_address);
                 Ok(())
             }
             Ok(Err(e)) => {
                 self.connected = false;
-                // Don't fail completely, just mark as disconnected
+                self.websocket = None;
                 println!("Failed to connect to MLS Delivery Service: {}", e);
                 Ok(())
             }
             Err(_) => {
                 self.connected = false;
+                self.websocket = None;
                 println!("Connection timeout to MLS Delivery Service");
                 Ok(())
             }
@@ -55,7 +70,7 @@ impl NetworkClient {
     }
 
     pub fn is_connected(&self) -> bool {
-        self.connected
+        self.connected && self.websocket.is_some()
     }
 
     pub async fn send_message(&self, message: &NetworkMessage) -> Result<()> {
@@ -63,9 +78,7 @@ impl NetworkClient {
             return Err(anyhow::anyhow!("Not connected to delivery service"));
         }
         
-        // In a real implementation, this would send the message over the network
-        // For now, we'll just log it
-        println!("Sending message: {:?}", message);
+        println!("Would send message: {:?}", message);
         Ok(())
     }
 
@@ -74,8 +87,7 @@ impl NetworkClient {
             return Err(anyhow::anyhow!("Not connected to delivery service"));
         }
         
-        // In a real implementation, this would fetch messages from the delivery service
-        // For now, we'll return an empty vector
+        println!("Would fetch messages for group: {}", _group_id);
         Ok(Vec::new())
     }
 
@@ -84,8 +96,7 @@ impl NetworkClient {
             return Err(anyhow::anyhow!("Not connected to delivery service"));
         }
         
-        // In a real implementation, this would publish the key package to the delivery service
-        println!("Publishing key package ({} bytes)", key_package.len());
+        println!("Would publish key package ({} bytes)", key_package.len());
         Ok(())
     }
 
@@ -94,42 +105,28 @@ impl NetworkClient {
             return Err(anyhow::anyhow!("Not connected to delivery service"));
         }
         
-        // In a real implementation, this would fetch key packages from the delivery service
-        println!("Fetching key packages for identity: {}", identity);
+        println!("Would fetch key packages for identity: {}", identity);
         Ok(Vec::new())
     }
 
-    pub async fn create_group(&self, group_id: &str, group_info: &[u8]) -> Result<()> {
+    pub async fn create_group(&mut self, group_id: &str, group_info: &[u8]) -> Result<()> {
         if !self.connected {
             return Err(anyhow::anyhow!("Not connected to delivery service"));
         }
         
-        // In a real implementation, this would create the group on the delivery service
-        println!("Creating group {} ({} bytes)", group_id, group_info.len());
+        println!("Would create group {} ({} bytes) via WebSocket", group_id, group_info.len());
         Ok(())
     }
 
-    pub async fn join_group(&self, group_id: &str, key_package: &[u8]) -> Result<Vec<u8>> {
+    pub async fn join_group(&mut self, group_id: &str, key_package: &[u8]) -> Result<Vec<u8>> {
         if !self.connected {
             return Err(anyhow::anyhow!("Not connected to delivery service"));
         }
         
-        // In a real implementation, this would join the group on the delivery service
-        // and return the Welcome message
-        println!("Joining group {} with key package ({} bytes)", group_id, key_package.len());
+        println!("Would join group {} with key package ({} bytes) via WebSocket", group_id, key_package.len());
         
-        // For testing purposes, we'll simulate different scenarios:
-        // 1. If the group ID contains "test", we'll simulate a successful join
-        // 2. Otherwise, we'll simulate the group not existing
-        
-        if group_id.contains("test") || group_id.contains("demo") {
-            // Simulate successful join - return some dummy welcome data
-            println!("Simulating successful join to group: {}", group_id);
-            Ok(vec![1, 2, 3, 4, 5]) // Dummy welcome data
-        } else {
-            // Simulate group not found
-            println!("Simulating group not found: {}", group_id);
-            Ok(Vec::new()) // Empty response indicates group not found
-        }
+        // For now, return empty to indicate group not found
+        // In a real implementation, this would send the join request and wait for response
+        Ok(Vec::new())
     }
 }

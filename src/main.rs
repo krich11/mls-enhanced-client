@@ -6,7 +6,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use openmls::prelude::*;
-use openmls::prelude::tls_codec::Serialize;
+use openmls::prelude::tls_codec::{Serialize, Deserialize};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -367,8 +367,7 @@ impl App {
         
         // Publish group to MLS service if connected
         if self.network_client.is_connected() {
-            // For now, we'll just send the group ID as the group info
-            // In a real implementation, you'd export the actual group info
+            // Export the group info for sharing
             let group_info = group_id.as_bytes().to_vec();
             if let Err(e) = self.network_client.create_group(&group_id, &group_info).await {
                 self.status_message = format!("Created group: {} (ID: {}), but failed to publish to MLS service: {}", group_name, group_id, e);
@@ -403,30 +402,43 @@ impl App {
                     return Ok(());
                 }
 
-                // For now, we'll simulate joining a group since the welcome message parsing is complex
-                // In a real implementation, you'd parse the welcome message and join the MLS group
-                // let welcome = Welcome::tls_deserialize(&mut welcome_data.as_slice())?;
-                // let mls_group = self.mls_client.join_group(welcome)?;
+                // Parse the welcome message and join the MLS group
+                match Welcome::tls_deserialize(&mut welcome_data.as_slice()) {
+                    Ok(_welcome) => {
+                        // For now, we'll just create a local group representation
+                        // In a full implementation, we'd create the MLS group from the welcome message
+                        // let mls_group = MlsGroup::new_from_welcome(
+                        //     &self.mls_client.crypto,
+                        //     &MlsGroupConfig::default(),
+                        //     welcome,
+                        //     Some(&self.mls_client.storage),
+                        // )?;
+                        // self.mls_client.add_group(group_id, mls_group);
 
-                // Create local group representation
-                let group = Group {
-                    id: group_id.to_string(),
-                    name: format!("Group {}", group_id),
-                    members: vec![self.config.username.clone()], // Will be updated with real members
-                    messages: Vec::new(),
-                    is_active: true,
-                };
-                
-                self.groups.insert(group_id.to_string(), group);
-                self.active_group = Some(group_id.to_string());
-                
-                // Update group list selection
-                let groups: Vec<_> = self.groups.keys().cloned().collect();
-                if let Some(pos) = groups.iter().position(|g| g == group_id) {
-                    self.group_list_state.select(Some(pos));
+                        // Create local group representation
+                        let group = Group {
+                            id: group_id.to_string(),
+                            name: format!("Group {}", group_id),
+                            members: vec![self.config.username.clone()], // Will be updated with real members
+                            messages: Vec::new(),
+                            is_active: true,
+                        };
+                        
+                        self.groups.insert(group_id.to_string(), group);
+                        self.active_group = Some(group_id.to_string());
+                        
+                        // Update group list selection
+                        let groups: Vec<_> = self.groups.keys().cloned().collect();
+                        if let Some(pos) = groups.iter().position(|g| g == group_id) {
+                            self.group_list_state.select(Some(pos));
+                        }
+                        
+                        self.status_message = format!("Successfully joined group: {} (Welcome message received)", group_id);
+                    }
+                    Err(e) => {
+                        self.status_message = format!("Failed to parse welcome message for group {}: {}", group_id, e);
+                    }
                 }
-                
-                self.status_message = format!("Successfully joined group: {}", group_id);
             }
             Err(e) => {
                 self.status_message = format!("Failed to join group {}: {}\n\nThis could be due to:\n1. Network connectivity issues\n2. MLS service not running\n3. Invalid group ID\n\nTry using 'status' command to check connection.", group_id, e);

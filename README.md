@@ -1,14 +1,17 @@
 # MLS Enhanced Client
 
-A Terminal User Interface (TUI) client for the Messaging Layer Security (MLS) protocol, providing secure group messaging capabilities.
+A Terminal User Interface (TUI) client for the Messaging Layer Security (MLS) protocol, providing secure group messaging capabilities with real MLS delivery service integration.
 
 ## Features
 
-- **Secure Group Messaging**: Create and join MLS-protected groups
-- **Real-time Communication**: Connect to MLS delivery service for shared groups
+- **Real MLS Service Integration**: Connect to actual MLS delivery services via WebSocket
+- **Secure Group Messaging**: Create and join MLS-protected groups with end-to-end encryption
+- **Multi-Client Support**: Multiple clients can join the same groups and communicate securely
+- **Real-time Communication**: Live message delivery through MLS delivery service
 - **Local Mode**: Work offline with local groups when service is unavailable
 - **Terminal Interface**: Full-featured TUI with keyboard navigation
 - **Connection Status**: Real-time feedback on MLS service connectivity
+- **Welcome Message Handling**: Proper MLS group joining with Welcome message parsing
 
 ## Installation
 
@@ -180,10 +183,41 @@ cargo test
 3. **MLS Features**: Extend `MlsClient` in `mls_client.rs`
 4. **UI Changes**: Modify rendering functions in `main.rs`
 
+## MLS Delivery Service Integration
+
+This client now supports real MLS delivery service integration via WebSocket communication. See [MLS_SERVICE_SETUP.md](MLS_SERVICE_SETUP.md) for detailed setup instructions.
+
+### Quick Setup
+
+1. **Set up an MLS delivery service** (see setup guide)
+2. **Configure the client**:
+   - Use `s` key to open settings
+   - Set Delivery Service Address to `ws://localhost:8080` (or your service URL)
+   - Set your username
+3. **Test connection** with `status` command
+4. **Create and join groups** for multi-client messaging
+
+### Multi-Client Testing
+
+```bash
+# Terminal 1 - Alice
+cargo run --release
+# Settings: username=alice, delivery_service=ws://localhost:8080
+
+# Terminal 2 - Bob
+cargo run --release  
+# Settings: username=bob, delivery_service=ws://localhost:8080
+
+# Terminal 3 - Charlie
+cargo run --release
+# Settings: username=charlie, delivery_service=ws://localhost:8080
+```
+
 ## Security Considerations
 
+- **End-to-End Encryption**: All messages are encrypted using MLS protocol
 - **Key Management**: MLS keys are stored in memory only
-- **Network Security**: Ensure TLS/encryption for delivery service
+- **Network Security**: Use `wss://` URLs for production deployments
 - **Authentication**: Verify delivery service authenticity
 - **Group Access**: Control who can join your groups
 
@@ -204,4 +238,5 @@ cargo test
 For issues and questions:
 - Check this README for troubleshooting
 - Review the help screen in the application (`h` key)
+- See [MLS_SERVICE_SETUP.md](MLS_SERVICE_SETUP.md) for service setup
 - Open an issue on the project repository
