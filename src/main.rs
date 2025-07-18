@@ -165,11 +165,19 @@ impl App {
                     self.active_group = Some(groups[new_selected].clone());
                 }
             }
-            KeyCode::PageUp => {
-                self.message_scroll = self.message_scroll.saturating_sub(5);
+            // Add Shift+Up and Shift+Down for message scroll
+            KeyCode::Up if event::KeyModifiers::SHIFT == event::KeyModifiers::SHIFT => {
+                self.message_scroll = self.message_scroll.saturating_sub(1);
             }
-            KeyCode::PageDown => {
-                self.message_scroll = self.message_scroll.saturating_add(5);
+            KeyCode::Down if event::KeyModifiers::SHIFT == event::KeyModifiers::SHIFT => {
+                self.message_scroll = self.message_scroll.saturating_add(1);
+            }
+            // Optionally, add j/k for single-line scroll
+            KeyCode::Char('j') => {
+                self.message_scroll = self.message_scroll.saturating_add(1);
+            }
+            KeyCode::Char('k') => {
+                self.message_scroll = self.message_scroll.saturating_sub(1);
             }
             _ => {}
         }
@@ -303,23 +311,28 @@ impl App {
                 self.screen = AppScreen::Settings;
                 self.input_mode = InputMode::Settings;
             }
-            Some(&"status") => {
-                if self.network_client.is_connected() {
-                    self.status_message = format!("Connected to MLS service at {}", self.config.delivery_service_address);
+            Some(&"groups") => {
+                if self.groups.is_empty() {
+                    self.status_message = "No groups available. Use 'create <group_name>' to create a group.".to_string();
                 } else {
-                    self.status_message = format!("Disconnected from MLS service at {}", self.config.delivery_service_address);
+                    let groups_info: Vec<String> = self.groups
+                        .iter()
+                        .map(|(id, group)| format!("• {} (ID: {}) - {} members", group.name, id, group.members.len()))
+                        .collect();
+                    self.status_message = format!("Available groups:\n{}", groups_info.join("\n"));
                 }
             }
-            Some(&"list") => {
-                if self.groups.is_empty() {
-                    self.status_message = "No groups available. Create a group with 'create <group_name>' or join an existing one with 'join <group_id>'".to_string();
+            Some(&"status") => {
+                if self.network_client.is_connected() {
+                    self.status_message = format!("Connected to MLS service at {}. {} groups available.", 
+                        self.config.delivery_service_address, self.groups.len());
                 } else {
-                    let group_list: Vec<String> = self.groups.keys().map(|id| format!("- {}", id)).collect();
-                    self.status_message = format!("Available groups:\n{}", group_list.join("\n"));
+                    self.status_message = format!("Disconnected from MLS service at {}. Groups will be local only.", 
+                        self.config.delivery_service_address);
                 }
             }
             _ => {
-                self.status_message = format!("Unknown command: {}", command);
+                self.status_message = format!("Unknown command: {}. Available commands: create, join, send, groups, status, settings, help, quit", command);
             }
         }
         Ok(())
@@ -505,7 +518,11 @@ impl App {
 
         let right_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(0), Constraint::Length(3), Constraint::Length(3)].as_ref())
+            .constraints([
+                Constraint::Min(0),         // Messages area
+                Constraint::Length(3),      // Input area
+                Constraint::Percentage(35), // Status area (takes 35% of right panel)
+            ].as_ref())
             .split(chunks[1]);
 
         // Groups list
@@ -578,10 +595,21 @@ impl App {
             .block(Block::default().borders(Borders::ALL).title(input_title));
         f.render_widget(input, right_chunks[1]);
 
-        // Status
-        let status = Paragraph::new(self.status_message.as_str())
+        // Status with available groups
+        let status_content = if self.groups.is_empty() {
+            format!("{}\n\nAvailable groups: None\nUse 'create <group_name>' to create a group", self.status_message)
+        } else {
+            let groups_list: Vec<String> = self.groups
+                .iter()
+                .map(|(id, group)| format!("• {} ({}) - {} members", group.name, id, group.members.len()))
+                .collect();
+            format!("{}\n\nAvailable groups:\n{}", self.status_message, groups_list.join("\n"))
+        };
+        
+        let status = Paragraph::new(status_content)
             .style(Style::default().fg(Color::Green))
-            .block(Block::default().borders(Borders::ALL).title("Status"));
+            .block(Block::default().borders(Borders::ALL).title("Status & Groups"))
+            .wrap(Wrap { trim: true });
         f.render_widget(status, right_chunks[2]);
 
         // Cursor
