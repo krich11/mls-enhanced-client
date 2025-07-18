@@ -390,7 +390,7 @@ impl App {
         if self.network_client.is_connected() {
             // Export the group info for sharing
             let group_info = group_id.as_bytes().to_vec();
-            if let Err(e) = self.network_client.create_group(&group_id, &group_info).await {
+            if let Err(e) = self.network_client.create_group(&group_id, &group_info, &self.config.username).await {
                 self.status_message = format!("Created group: {} (ID: {}), but failed to publish to MLS service: {}", group_name, group_id, e);
             } else {
                 self.status_message = format!("Created and published group: {} (ID: {})", group_name, group_id);
@@ -416,7 +416,7 @@ impl App {
         }
 
         // Try to join the group through the MLS service
-        match self.network_client.join_group(group_id, &self.mls_client.key_package.tls_serialize_detached()?).await {
+        match self.network_client.join_group(group_id, &self.mls_client.key_package.tls_serialize_detached()?, &self.config.username).await {
             Ok(welcome_data) => {
                 if welcome_data.is_empty() {
                     self.status_message = format!("Group {} not found or access denied. This could mean:\n1. The group doesn't exist on the MLS service\n2. You don't have permission to join\n3. The MLS service is not properly configured\n\nTry creating the group first with 'create <group_name>' or check your MLS service configuration.", group_id);

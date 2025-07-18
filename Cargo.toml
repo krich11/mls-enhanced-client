@@ -34,3 +34,4 @@ thiserror = "1.0"
 # Other utilities
 uuid = { version = "1.0", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
+base64 = "0.21"

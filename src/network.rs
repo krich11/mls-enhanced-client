@@ -5,6 +5,7 @@ use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::time::timeout;
 use tokio::io::AsyncWriteExt;
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkMessage {
@@ -29,8 +30,8 @@ pub struct CreateGroupMessage {
     #[serde(rename = "type")]
     pub message_type: String,
     pub group_id: String,
-    pub group_info: Vec<u8>,
-    pub client_id: String,
+    pub creator_id: String,
+    pub group_info: String, // base64 encoded
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -38,8 +39,8 @@ pub struct JoinGroupMessage {
     #[serde(rename = "type")]
     pub message_type: String,
     pub group_id: String,
-    pub key_package: Vec<u8>,
     pub client_id: String,
+    pub key_package: String, // base64 encoded
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -75,7 +76,7 @@ impl NetworkClient {
             Ok(Ok(stream)) => {
                 // Send initial message to establish connection
                 let list_message = ListKeyPackagesMessage {
-                    message_type: "ListKeyPackages".to_string(),
+                    message_type: "list_key_packages".to_string(),
                     client_id: "mls-client".to_string(),
                 };
                 
@@ -162,17 +163,17 @@ impl NetworkClient {
         Ok(Vec::new())
     }
 
-    pub async fn create_group(&self, group_id: &str, group_info: &[u8]) -> Result<()> {
+    pub async fn create_group(&self, group_id: &str, group_info: &[u8], creator_id: &str) -> Result<()> {
         if !self.connected {
             return Err(anyhow::anyhow!("Not connected to delivery service"));
         }
         
         if let Some(stream_arc) = &self.stream {
             let create_message = CreateGroupMessage {
-                message_type: "CreateGroup".to_string(),
+                message_type: "create_group".to_string(),
                 group_id: group_id.to_string(),
-                group_info: group_info.to_vec(),
-                client_id: "mls-client".to_string(),
+                creator_id: creator_id.to_string(),
+                group_info: BASE64.encode(group_info),
             };
             
             let message_json = serde_json::to_string(&create_message)?;
@@ -186,17 +187,17 @@ impl NetworkClient {
         Ok(())
     }
 
-    pub async fn join_group(&self, group_id: &str, key_package: &[u8]) -> Result<Vec<u8>> {
+    pub async fn join_group(&self, group_id: &str, key_package: &[u8], client_id: &str) -> Result<Vec<u8>> {
         if !self.connected {
             return Err(anyhow::anyhow!("Not connected to delivery service"));
         }
         
         if let Some(stream_arc) = &self.stream {
             let join_message = JoinGroupMessage {
-                message_type: "JoinGroup".to_string(),
+                message_type: "join_group".to_string(),
                 group_id: group_id.to_string(),
-                key_package: key_package.to_vec(),
-                client_id: "mls-client".to_string(),
+                client_id: client_id.to_string(),
+                key_package: BASE64.encode(key_package),
             };
             
             let message_json = serde_json::to_string(&join_message)?;
@@ -219,7 +220,7 @@ impl NetworkClient {
         
         if let Some(stream_arc) = &self.stream {
             let list_message = ListGroupsMessage {
-                message_type: "ListGroups".to_string(),
+                message_type: "list_groups".to_string(),
                 client_id: "mls-client".to_string(),
             };
             
