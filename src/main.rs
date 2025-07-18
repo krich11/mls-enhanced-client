@@ -165,14 +165,7 @@ impl App {
                     self.active_group = Some(groups[new_selected].clone());
                 }
             }
-            // Add Shift+Up and Shift+Down for message scroll
-            KeyCode::Up if event::KeyModifiers::SHIFT == event::KeyModifiers::SHIFT => {
-                self.message_scroll = self.message_scroll.saturating_sub(1);
-            }
-            KeyCode::Down if event::KeyModifiers::SHIFT == event::KeyModifiers::SHIFT => {
-                self.message_scroll = self.message_scroll.saturating_add(1);
-            }
-            // Optionally, add j/k for single-line scroll
+            // Add j/k for single-line scroll (Mac-friendly)
             KeyCode::Char('j') => {
                 self.message_scroll = self.message_scroll.saturating_add(1);
             }
@@ -613,13 +606,22 @@ impl App {
 
         // Status with available groups
         let status_content = if self.groups.is_empty() {
-            format!("{}\n\nAvailable groups: None\nUse 'create <group_name>' to create a group", self.status_message)
+            format!(
+                "User: {}\n{}\n\nAvailable groups: None\nUse 'create <group_name>' to create a group",
+                self.config.username,
+                self.status_message
+            )
         } else {
             let groups_list: Vec<String> = self.groups
                 .iter()
                 .map(|(id, group)| format!("• {} ({}) - {} members", group.name, id, group.members.len()))
                 .collect();
-            format!("{}\n\nAvailable groups:\n{}", self.status_message, groups_list.join("\n"))
+            format!(
+                "User: {}\n{}\n\nAvailable groups:\n{}",
+                self.config.username,
+                self.status_message,
+                groups_list.join("\n")
+            )
         };
         
         let status = Paragraph::new(status_content)

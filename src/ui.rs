@@ -4,6 +4,10 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
 };
 
+// UI utility functions - currently unused but kept for future development
+// Uncomment and implement as needed for UI enhancements
+
+/*
 /// Create a styled paragraph with border
 pub fn create_bordered_paragraph<'a>(title: &'a str, content: &'a str, style: Style) -> Paragraph<'a> {
     Paragraph::new(content)
@@ -63,3 +67,4 @@ pub fn format_file_size(size: u64) -> String {
         format!("{:.1} {}", size, UNITS[unit_index])
     }
 }
+*/

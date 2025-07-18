@@ -18,14 +18,6 @@ pub struct NetworkMessage {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct HandshakeMessage {
-    #[serde(rename = "type")]
-    pub message_type: String,
-    pub client_id: String,
-    pub version: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct ListKeyPackagesMessage {
     #[serde(rename = "type")]
     pub message_type: String,
