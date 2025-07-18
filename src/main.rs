@@ -90,6 +90,12 @@ impl App {
         let mut group_list_state = ListState::default();
         group_list_state.select(Some(0));
 
+        let status_message = if network_client.is_connected() {
+            format!("Connected to MLS service at {}. Groups will be synchronized.", config.delivery_service_address)
+        } else {
+            format!("Disconnected from MLS service at {}. Groups will be local only.", config.delivery_service_address)
+        };
+
         Ok(Self {
             config: config.clone(),
             mls_client,
@@ -101,7 +107,7 @@ impl App {
             screen: AppScreen::Main,
             group_list_state,
             message_scroll: 0,
-            status_message: format!("Connected as {}", config.username),
+            status_message,
             should_quit: false,
             settings_field: 0,
             temp_delivery_service: config.delivery_service_address.clone(),
