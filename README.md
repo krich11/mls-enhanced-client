@@ -119,6 +119,60 @@ The client uses a `config.json` file for settings:
 
 Configuration is automatically created on first run and can be modified through the settings screen.
 
+## Testing
+
+### Automated Testing Script
+
+Use the provided testing script for comprehensive multi-group testing:
+
+```bash
+./test_multi_group.sh
+```
+
+This script will:
+- Check if the MLS Delivery Service is running
+- Build the client
+- Create test configurations for three users
+- Provide detailed testing instructions
+- Generate expected results for verification
+
+### Manual Testing
+
+To test the multi-group messaging functionality:
+
+1. **Start the MLS Delivery Service**:
+   ```bash
+   git clone https://github.com/krich11/mls-delivery-service
+   cd mls-delivery-service
+   cargo run
+   ```
+
+2. **Run Multiple Client Instances**:
+   ```bash
+   # Terminal 1 (Alice)
+   cp config_user1.json config.json
+   cargo run
+   
+   # Terminal 2 (Bob)  
+   cp config_user2.json config.json
+   cargo run
+   
+   # Terminal 3 (Charlie)
+   cp config_user3.json config.json
+   cargo run
+   ```
+
+3. **Test Scenarios**:
+   - **Scenario 1**: Alice creates "team-all", Bob and Charlie join
+   - **Scenario 2**: Alice creates "team-leads", Bob joins
+   - **Scenario 3**: Test multi-group messaging and isolation
+
+4. **Verification**:
+   - Messages appear in correct groups only
+   - Group switching works properly
+   - End-to-end encryption is transparent
+   - Three users can communicate across two groups
+
 ## Architecture
 
 ### Core Components
