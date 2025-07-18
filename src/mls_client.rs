@@ -4,6 +4,7 @@ use openmls_rust_crypto::OpenMlsRustCrypto;
 use openmls_basic_credential::SignatureKeyPair;
 use openmls_memory_storage::MemoryStorage;
 use crate::crypto::CryptoProvider;
+use std::collections::HashMap;
 
 pub struct MlsClient {
     pub crypto: OpenMlsRustCrypto,
@@ -12,6 +13,7 @@ pub struct MlsClient {
     pub credential: BasicCredential,
     pub signature_key: SignaturePublicKey,
     pub key_package: KeyPackage,
+    pub groups: HashMap<String, MlsGroup>,
 }
 
 impl MlsClient {
@@ -51,6 +53,7 @@ impl MlsClient {
             credential,
             signature_key,
             key_package: key_package_bundle.key_package().clone(),
+            groups: HashMap::new(),
         })
     }
 
@@ -78,22 +81,15 @@ impl MlsClient {
         Ok(group)
     }
 
-    pub fn join_group(&self, _welcome: Welcome) -> Result<MlsGroup> {
-        // For now, we'll implement a basic version
-        // In a full implementation, you'd need to handle the welcome message properly
-        // This is a placeholder that creates a new group
-        let credential_with_key = CredentialWithKey {
-            credential: self.credential.clone().into(),
-            signature_key: self.signature_key.clone(),
-        };
+    pub fn get_group(&self, group_id: &str) -> Option<&MlsGroup> {
+        self.groups.get(group_id)
+    }
 
-        let group = MlsGroup::new(
-            &self.crypto,
-            &self.signer,
-            &MlsGroupCreateConfig::default(),
-            credential_with_key,
-        )?;
+    pub fn get_group_mut(&mut self, group_id: &str) -> Option<&mut MlsGroup> {
+        self.groups.get_mut(group_id)
+    }
 
-        Ok(group)
+    pub fn add_group(&mut self, group_id: &str, group: MlsGroup) {
+        self.groups.insert(group_id.to_string(), group);
     }
 }

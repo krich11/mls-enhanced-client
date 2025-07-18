@@ -1,260 +1,150 @@
 # MLS Enhanced Client
 
-A fully functional, CLI-based MLS (Messaging Layer Security) messaging client built in Rust with a modern Terminal User Interface (TUI). This client supports multiple simultaneous MLS groups, group creation, and secure message sending/receiving with end-to-end encryption.
+A Terminal User Interface (TUI) client for the Messaging Layer Security (MLS) protocol, providing secure group messaging capabilities.
 
 ## Features
 
-- **Multiple MLS Groups**: Support for simultaneous participation in multiple MLS groups
-- **Modern TUI Interface**: Teams/Slack-like experience with `ratatui` featuring:
-  - Sidebar for group selection
-  - Message display area with timestamps
-  - Interactive input fields
-  - Settings screen
-  - Help screen
-- **End-to-End Encryption**: Uses OpenMLS 0.5 with `openmls_rust_crypto` for secure messaging
-- **Flexible Configuration**: JSON-based configuration with delivery service settings
-- **Async Networking**: Built with Tokio for efficient TCP networking
-- **Cryptographic Agility**: Designed for future key encapsulation mechanisms (KEMs)
+- **Secure Group Messaging**: Create and join MLS-protected groups
+- **Real-time Communication**: Connect to MLS delivery service for shared groups
+- **Local Mode**: Work offline with local groups when service is unavailable
+- **Terminal Interface**: Full-featured TUI with keyboard navigation
+- **Connection Status**: Real-time feedback on MLS service connectivity
 
 ## Installation
 
 ### Prerequisites
 
-- Rust 1.70+ (2021 edition)
-- Linux environment
-- Access to MLS Delivery Service (default: `127.0.0.1:8080`)
+- Rust 1.70+ and Cargo
+- Network access to MLS delivery service (optional for local mode)
 
-### Building from Source
+### Build and Run
 
 ```bash
-git clone https://github.com/krich11/mls-enhanced-client.git
+# Clone the repository
+git clone <repository-url>
 cd mls-enhanced-client
+
+# Build the project
 cargo build --release
-```
 
-### Running the Client
-
-```bash
-cargo run
+# Run the client
+cargo run --release
 ```
 
 ## Usage
 
-### Interface Overview
+### Starting the Application
 
-The client features a split-screen interface:
-
-- **Left Panel**: 
-  - Groups list (top)
-  - Controls help (bottom)
-- **Right Panel**:
-  - Message display (top)
-  - Input field (middle)
-  - Status bar (bottom)
+1. Run the application: `cargo run --release`
+2. The client will attempt to connect to the MLS delivery service
+3. Check connection status in the bottom status bar
 
 ### Navigation
 
-- **Arrow Keys (↑/↓)**: Select active group
+- **↑/↓**: Navigate between groups
 - **PageUp/PageDown**: Scroll through messages
 - **c**: Enter command mode
 - **m**: Enter message mode (when group is selected)
-- **s**: Open settings screen
-- **h**: Show help screen
+- **s**: Open settings
+- **h**: Show help
 - **q**: Quit application
 
 ### Commands
 
-Enter command mode by pressing `c`, then type:
+#### Command Mode (`c` key)
 
-- `create <group_name>` - Create a new MLS group
-- `join <group_id>` - Join an existing group
-- `send <message>` - Send a message to the active group
-- `settings` - Open settings screen
-- `help` - Show help screen
-- `quit` - Exit the application
+- `create <group_name>`: Create a new group
+- `join <group_id>`: Join an existing group
+- `send <message>`: Send a message to the active group
+- `status`: Check MLS service connection status
+- `settings`: Open settings screen
+- `help`: Show help screen
+- `quit`: Exit application
 
-### Settings Configuration
+#### Message Mode (`m` key)
 
-Access settings by pressing `s` or using the `settings` command. Configure:
+- Type your message and press Enter to send
+- Press Esc to cancel
 
-- **Delivery Service Address**: IP:PORT of the MLS Delivery Service (default: `127.0.0.1:8080`)
-- **Username**: Your identity for MLS credentials (default: `user`)
+### Settings
 
-Settings are automatically saved to `config.json`.
+Access settings with the `s` key or `settings` command:
 
-### Message Sending
+- **Delivery Service Address**: URL/address of the MLS delivery service
+- **Username**: Your identity for MLS groups
 
-1. Select a group using arrow keys
-2. Press `m` to enter message mode
-3. Type your message
-4. Press Enter to send
-5. Press Esc to cancel
-
-### Group Management
-
-#### Creating a Group
-
-```bash
-# In command mode (press 'c')
-create my-team
-```
-
-#### Joining a Group
-
-```bash
-# In command mode (press 'c')
-join <group-id>
-```
+Press Tab to navigate between fields, Enter to save, Esc to cancel.
 
 ## Configuration
 
-The client uses a `config.json` file for settings:
+The client stores configuration in `config.json`:
 
 ```json
 {
-  "username": "your-username",
+  "username": "your_username",
   "delivery_service_address": "127.0.0.1:8080"
 }
 ```
 
-Configuration is automatically created on first run and can be modified through the settings screen.
-
-## Testing
-
-### Automated Testing Script
-
-Use the provided testing script for comprehensive multi-group testing:
-
-```bash
-./test_multi_group.sh
-```
-
-This script will:
-- Check if the MLS Delivery Service is running
-- Build the client
-- Create test configurations for three users
-- Provide detailed testing instructions
-- Generate expected results for verification
-
-### Manual Testing
-
-To test the multi-group messaging functionality:
-
-1. **Start the MLS Delivery Service**:
-   ```bash
-   git clone https://github.com/krich11/mls-delivery-service
-   cd mls-delivery-service
-   cargo run
-   ```
-
-2. **Run Multiple Client Instances**:
-   ```bash
-   # Terminal 1 (Alice)
-   cp config_user1.json config.json
-   cargo run
-   
-   # Terminal 2 (Bob)  
-   cp config_user2.json config.json
-   cargo run
-   
-   # Terminal 3 (Charlie)
-   cp config_user3.json config.json
-   cargo run
-   ```
-
-3. **Test Scenarios**:
-   - **Scenario 1**: Alice creates "team-all", Bob and Charlie join
-   - **Scenario 2**: Alice creates "team-leads", Bob joins
-   - **Scenario 3**: Test multi-group messaging and isolation
-
-4. **Verification**:
-   - Messages appear in correct groups only
-   - Group switching works properly
-   - End-to-end encryption is transparent
-   - Three users can communicate across two groups
-
-## Architecture
-
-### Core Components
-
-- **MLS Client**: Handles MLS cryptographic operations using OpenMLS
-- **Network Client**: Manages TCP connections to the MLS Delivery Service
-- **TUI Interface**: Provides the terminal-based user interface
-- **Configuration Manager**: Handles settings persistence
-
-### Cryptographic Details
-
-- **Ciphersuite**: `MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519`
-- **Protocol Version**: MLS 1.0
-- **Credentials**: BasicCredential with username-based identity
-- **Key Exchange**: X25519 DHKEM
-- **Signature**: Ed25519
-
 ## Troubleshooting
 
-### Common Issues
+### Connection Issues
 
-#### 1. Failed to Connect to Delivery Service
+**Problem**: "Disconnected from MLS service" status
+- **Cause**: MLS delivery service is not running or unreachable
+- **Solution**: 
+  - Verify the delivery service is running
+  - Check the service address in settings
+  - Ensure network connectivity
+  - Use `status` command to test connection
 
-**Symptoms**: "Connection timeout to MLS Delivery Service" or "Failed to connect"
+**Problem**: Cannot join groups
+- **Cause**: Not connected to MLS service
+- **Solution**: 
+  - Connect to MLS delivery service first
+  - Check service address in settings
+  - Verify group ID exists on the service
 
-**Solutions**:
-- Ensure the MLS Delivery Service is running at the configured address
-- Check network connectivity
-- Verify the delivery service address in settings (`s` key)
-- Default service should be running on `127.0.0.1:8080`
+### Group Issues
 
-#### 2. Configuration File Issues
+**Problem**: Groups show "(1)" member count
+- **Cause**: Working in local mode or group not properly synced
+- **Solution**:
+  - Connect to MLS service for shared groups
+  - Use `status` command to verify connection
+  - Rejoin groups after connecting to service
 
-**Symptoms**: Settings not persisting or JSON parsing errors
+**Problem**: Cannot create groups
+- **Cause**: MLS service connection issues
+- **Solution**:
+  - Check connection status
+  - Verify service address
+  - Groups can be created locally when disconnected
 
-**Solutions**:
-- Delete `config.json` to regenerate with defaults
-- Ensure proper JSON formatting
-- Check file permissions
+### Application Issues
 
-#### 3. Group Creation/Join Issues
+**Problem**: Terminal display issues
+- **Cause**: Terminal compatibility or size issues
+- **Solution**:
+  - Ensure terminal supports UTF-8
+  - Resize terminal window if needed
+  - Use a modern terminal emulator
 
-**Symptoms**: Groups not appearing or cryptographic errors
+**Problem**: Key bindings not working
+- **Cause**: Terminal configuration or conflicts
+- **Solution**:
+  - Check terminal key mapping
+  - Ensure no other applications are capturing keys
+  - Try different terminal emulator
 
-**Solutions**:
-- Verify MLS Delivery Service is properly configured
-- Check username configuration for valid identity
-- Ensure network connectivity to delivery service
+### Performance Issues
 
-#### 4. TUI Display Issues
-
-**Symptoms**: Interface not rendering properly or garbled text
-
-**Solutions**:
-- Ensure terminal supports Unicode characters
-- Try resizing terminal window
-- Check terminal compatibility with crossterm
-
-#### 5. Compilation Errors
-
-**Symptoms**: Build failures with OpenMLS dependencies
-
-**Solutions**:
-- Update Rust to latest stable version
-- Clear cargo cache: `cargo clean`
-- Update dependencies: `cargo update`
-
-### Debug Mode
-
-For verbose logging, set the environment variable:
-
-```bash
-RUST_LOG=debug cargo run
-```
-
-### Network Debugging
-
-To test network connectivity:
-
-```bash
-telnet 127.0.0.1 8080
-```
+**Problem**: Slow response or high CPU usage
+- **Cause**: Large message history or network issues
+- **Solution**:
+  - Restart application to clear message cache
+  - Check network connectivity
+  - Reduce message history if needed
 
 ## Development
 
@@ -262,41 +152,40 @@ telnet 127.0.0.1 8080
 
 ```
 src/
-├── main.rs           # Main application and TUI logic
-├── config.rs         # Configuration management
-├── crypto.rs         # Cryptographic provider
-├── mls_client.rs     # MLS operations
-├── network.rs        # Network client
-└── ui.rs            # UI utilities
+├── main.rs          # Main application logic and TUI
+├── config.rs        # Configuration management
+├── crypto.rs        # Cryptographic utilities
+├── mls_client.rs    # MLS protocol client
+├── network.rs       # Network communication
+└── ui.rs           # UI components (if any)
 ```
 
-### Adding New Features
-
-1. **New Commands**: Add to `execute_command()` in `main.rs`
-2. **UI Changes**: Modify render functions in `main.rs`
-3. **Network Protocol**: Update `network.rs` for new message types
-4. **Cryptographic Features**: Extend `mls_client.rs`
-
-### Testing
-
-Run tests with:
+### Building for Development
 
 ```bash
+# Debug build
+cargo build
+
+# Run with debug output
+RUST_LOG=debug cargo run
+
+# Run tests
 cargo test
 ```
 
-### Code Quality
+### Adding Features
 
-```bash
-# Format code
-cargo fmt
+1. **New Commands**: Add to `execute_command()` in `main.rs`
+2. **Network Features**: Extend `NetworkClient` in `network.rs`
+3. **MLS Features**: Extend `MlsClient` in `mls_client.rs`
+4. **UI Changes**: Modify rendering functions in `main.rs`
 
-# Run lints
-cargo clippy
+## Security Considerations
 
-# Security audit
-cargo audit
-```
+- **Key Management**: MLS keys are stored in memory only
+- **Network Security**: Ensure TLS/encryption for delivery service
+- **Authentication**: Verify delivery service authenticity
+- **Group Access**: Control who can join your groups
 
 ## Contributing
 
@@ -308,17 +197,11 @@ cargo audit
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- [OpenMLS](https://github.com/openmls/openmls) for MLS implementation
-- [ratatui](https://github.com/ratatui-org/ratatui) for the TUI framework
-- [Tokio](https://github.com/tokio-rs/tokio) for async runtime
+[Add your license information here]
 
 ## Support
 
 For issues and questions:
-- Create an issue on GitHub
-- Check the troubleshooting section above
-- Review the OpenMLS documentation for MLS-specific questions
+- Check this README for troubleshooting
+- Review the help screen in the application (`h` key)
+- Open an issue on the project repository
